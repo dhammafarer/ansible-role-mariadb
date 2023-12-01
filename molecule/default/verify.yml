@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Run tasks for the user "{{ mariadb_user }}".
+      block:
+        - name: Check that 127.0.0.1:3306 is listening
+          when: mariadb_publish | length > 0
+          ansible.builtin.wait_for:
+            port: 3306
+            timeout: 2

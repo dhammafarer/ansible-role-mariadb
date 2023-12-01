@@ -1,0 +1,53 @@
+---
+- name: Ensure Podman network for mariadb exists.
+  containers.podman.podman_network:
+    name: "{{ mariadb_net_name }}"
+    state: present
+
+- name: Ensure volume directories exist.
+  become: true
+  ansible.builtin.file:
+    path: "{{ mariadb_volumes_dir }}/{{ item.dir }}"
+    owner: "{{ mariadb_user }}"
+    group: "{{ mariadb_user }}"
+    mode: "{{ item.mode }}"
+    state: directory
+  loop:
+    - { dir: "data", mode: "770"}
+
+- name: Ensure a pod exists for {{ mariadb_pod_name }}.
+  containers.podman.podman_pod:
+    name: "{{ mariadb_pod_name }}"
+    state: created
+    userns: keep-id
+    recreate: true
+    publish: "{{ mariadb_publish }}"
+    network:
+      - "{{ mariadb_net_name }}"
+
+- name: Ensure db container exists.
+  containers.podman.podman_container:
+    pod: "{{ mariadb_pod_name }}"
+    name: "{{ mariadb_container_name }}"
+    image: "{{ mariadb_image_name }}:{{ mariadb_image_tag }}"
+    state: created
+    volumes:
+      - "{{ mariadb_volumes_dir }}/data:/var/lib/mysql:Z"
+    env:
+      MYSQL_USER: "{{ mariadb_db_user }}"
+      MYSQL_DATABASE: "{{ mariadb_db_database }}"
+      MYSQL_PASSWORD: "{{ mariadb_db_password }}"
+      MYSQL_ROOT_PASSWORD: "{{ mariadb_db_root_password }}"
+
+- name: Generate systemd units for {{ mariadb_pod_name }}.
+  containers.podman.podman_generate_systemd:
+    name: "{{ mariadb_pod_name }}"
+    dest: "/home/{{ mariadb_user }}/.config/systemd/user/"
+    restart_policy: on-failure
+
+- name: Ensure systemd units are started and enabled for {{ mariadb_pod_name }}.
+  ansible.builtin.systemd:
+    scope: user
+    daemon_reload: true
+    name: "pod-{{ mariadb_pod_name }}"
+    state: started
