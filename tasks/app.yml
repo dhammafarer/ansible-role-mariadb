@@ -44,6 +44,7 @@
     name: "{{ mariadb_pod_name }}"
     dest: "/home/{{ mariadb_user }}/.config/systemd/user/"
     restart_policy: on-failure
+    force: true
 
 - name: Ensure systemd units are started and enabled for {{ mariadb_pod_name }}.
   ansible.builtin.systemd:
